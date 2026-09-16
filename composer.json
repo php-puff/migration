@@ -35,6 +35,9 @@
             "config": {"migration.php": "config/migration.php"},
             "providers": [
                 "Puff\\Migration\\ServiceProvider"
+            ],
+            "commands": [
+                "Puff\\Migration\\ConsoleProvider"
             ]
         }
     },
