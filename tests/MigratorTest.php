@@ -27,9 +27,10 @@ final class MigratorTest extends TestCase
         $directory = $database . '-migrations';
         self::assertTrue(\mkdir($directory));
         try {
-            $migrator = new Migrator(new DatabaseManager('sqlite', [
-                'sqlite' => ['driver' => 'sqlite', 'database' => $database],
-            ]), $directory);
+            $manager = new DatabaseManager('sqlite', [
+                'sqlite' => ['driver' => 'sqlite', 'database' => $database, 'prefix' => 'app_'],
+            ]);
+            $migrator = new Migrator($manager, $directory);
             $path = $migrator->create('create_users_table');
             $source = \file_get_contents($path);
             self::assertIsString($source);
@@ -43,6 +44,9 @@ final class MigratorTest extends TestCase
 
             self::assertSame('pending', $migrator->status()[0]['status']);
             self::assertCount(1, $migrator->run()['migrations']);
+            $tables = $manager->connection()->fetchAll("SELECT name FROM sqlite_master WHERE type = 'table'");
+            self::assertContains(['name' => 'app_users'], $tables);
+            self::assertContains(['name' => 'app_puff_migrations'], $tables);
             self::assertSame('applied', $migrator->status()[0]['status']);
             self::assertCount(1, $migrator->rollback()['migrations']);
             self::assertSame('pending', $migrator->status()[0]['status']);

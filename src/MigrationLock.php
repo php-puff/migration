@@ -22,9 +22,9 @@ final class MigrationLock
     private bool $locked = false;
     private readonly string $name;
 
-    public function __construct(private readonly ConnectionInterface $connection)
+    public function __construct(private readonly ConnectionInterface $connection, string $prefix = '')
     {
-        $this->name = 'puff_migration_' . \substr($connection->fingerprint(), 0, 32);
+        $this->name = 'puff_migration_' . \substr(\hash('sha256', $connection->fingerprint() . '|' . $prefix), 0, 32);
     }
 
     public function acquire(): void

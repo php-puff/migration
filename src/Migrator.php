@@ -22,6 +22,7 @@ final class Migrator
     private readonly MigrationRepository $repository;
     private readonly MigrationLoader $loader;
     private readonly MigrationLock $lock;
+    private readonly string $prefix;
 
     public function __construct(
         private readonly DatabaseManagerInterface $databases,
@@ -29,9 +30,10 @@ final class Migrator
         string|null $connection = null,
     ) {
         $this->connection = $databases->connection($connection);
-        $this->repository = new MigrationRepository($this->connection);
+        $this->prefix = $databases->configuration($connection)->prefix;
+        $this->repository = new MigrationRepository($this->connection, $this->prefix);
         $this->loader = new MigrationLoader($directory);
-        $this->lock = new MigrationLock($this->connection);
+        $this->lock = new MigrationLock($this->connection, $this->prefix);
     }
 
     /** @return list<array{name: string, status: string, batch: int|null, applied_at: string|null}> */
@@ -144,7 +146,7 @@ final class Migrator
     private function apply(MigrationFile $file, string $direction, int $batch, bool $pretend): array
     {
         $migration = $file->load();
-        $schema = new Schema($this->connection, $pretend);
+        $schema = new Schema($this->connection, $pretend, $this->prefix);
         $started = \hrtime(true);
         $operation = function () use ($migration, $schema, $direction, $file, $batch, $started, $pretend): void {
             $direction === 'up' ? $migration->up($schema) : $migration->down($schema);

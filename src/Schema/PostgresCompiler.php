@@ -17,7 +17,7 @@ final class PostgresCompiler extends AbstractCompiler
 {
     public function hasTable(string $table): array
     {
-        Identifier::validate($table);
+        $table = $this->table($table);
         return ['SELECT to_regclass(?) AS name', [$table]];
     }
 

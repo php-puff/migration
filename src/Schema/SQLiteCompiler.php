@@ -19,7 +19,7 @@ final class SQLiteCompiler extends AbstractCompiler
 {
     public function hasTable(string $table): array
     {
-        Identifier::validate($table);
+        $table = $this->table($table);
         return ["SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [$table]];
     }
 

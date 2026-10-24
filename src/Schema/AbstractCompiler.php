@@ -19,6 +19,13 @@ use Puff\Migration\Index;
 
 abstract class AbstractCompiler implements CompilerInterface
 {
+    public function __construct(private readonly string $prefix = '')
+    {
+        if ($prefix !== '' && \preg_match('/^[A-Za-z0-9_]+$/D', $prefix) !== 1) {
+            throw new \InvalidArgumentException("Invalid schema table prefix [{$prefix}].");
+        }
+    }
+
     public function create(Blueprint $blueprint): array
     {
         $definitions = \array_map($this->column(...), $blueprint->columns());
@@ -30,7 +37,7 @@ abstract class AbstractCompiler implements CompilerInterface
         }
         $sql = [\sprintf(
             'CREATE TABLE %s (%s)',
-            $this->quote($blueprint->table),
+            $this->quote($this->table($blueprint->table)),
             \implode(', ', $definitions),
         )];
         foreach ($this->indexes($blueprint) as $index) {
@@ -45,21 +52,21 @@ abstract class AbstractCompiler implements CompilerInterface
         foreach ($blueprint->columns() as $column) {
             $sql[] = \sprintf(
                 'ALTER TABLE %s ADD COLUMN %s',
-                $this->quote($blueprint->table),
+                $this->quote($this->table($blueprint->table)),
                 $this->column($column),
             );
         }
         foreach ($blueprint->droppedColumns() as $column) {
             $sql[] = \sprintf(
                 'ALTER TABLE %s DROP COLUMN %s',
-                $this->quote($blueprint->table),
+                $this->quote($this->table($blueprint->table)),
                 $this->quote($column),
             );
         }
         foreach ($blueprint->renamedColumns() as $rename) {
             $sql[] = \sprintf(
                 'ALTER TABLE %s RENAME COLUMN %s TO %s',
-                $this->quote($blueprint->table),
+                $this->quote($this->table($blueprint->table)),
                 $this->quote($rename['from']),
                 $this->quote($rename['to']),
             );
@@ -72,7 +79,7 @@ abstract class AbstractCompiler implements CompilerInterface
         foreach ($blueprint->foreignKeys() as $foreignKey) {
             $sql[] = \sprintf(
                 'ALTER TABLE %s ADD %s',
-                $this->quote($blueprint->table),
+                $this->quote($this->table($blueprint->table)),
                 $this->foreign($blueprint->table, $foreignKey),
             );
         }
@@ -81,12 +88,12 @@ abstract class AbstractCompiler implements CompilerInterface
 
     public function rename(string $from, string $to): string
     {
-        return \sprintf('ALTER TABLE %s RENAME TO %s', $this->quote($from), $this->quote($to));
+        return \sprintf('ALTER TABLE %s RENAME TO %s', $this->quote($this->table($from)), $this->quote($this->table($to)));
     }
 
     public function drop(string $table, bool $ifExists = false): string
     {
-        return 'DROP TABLE ' . ($ifExists ? 'IF EXISTS ' : '') . $this->quote($table);
+        return 'DROP TABLE ' . ($ifExists ? 'IF EXISTS ' : '') . $this->quote($this->table($table));
     }
 
     protected function quote(string $identifier): string
@@ -163,7 +170,7 @@ abstract class AbstractCompiler implements CompilerInterface
             'CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)',
             $this->quote($name),
             $this->quote($foreignKey->column),
-            $this->quote($foreignKey->referencedTable),
+            $this->quote($this->table($foreignKey->referencedTable)),
             $this->quote($foreignKey->referencedColumn),
         );
         if ($foreignKey->deleteAction !== null) {
@@ -182,7 +189,7 @@ abstract class AbstractCompiler implements CompilerInterface
             'CREATE %sINDEX %s ON %s (%s)',
             $index->unique ? 'UNIQUE ' : '',
             $this->quote($name),
-            $this->quote($table),
+            $this->quote($this->table($table)),
             \implode(', ', \array_map($this->quote(...), $index->columns)),
         );
     }
@@ -210,8 +217,13 @@ abstract class AbstractCompiler implements CompilerInterface
     /** @param list<string> $columns */
     private function name(string $table, array $columns, string $suffix): string
     {
-        $name = \strtolower($table . '_' . \implode('_', $columns) . '_' . $suffix);
+        $name = \strtolower($this->table($table) . '_' . \implode('_', $columns) . '_' . $suffix);
         return Identifier::validate(\strlen($name) <= 63 ? $name : \substr($name, 0, 54) . '_' . \substr(\hash('sha256', $name), 0, 8));
+    }
+
+    protected function table(string $table): string
+    {
+        return $this->prefix . Identifier::validate($table);
     }
 
     abstract protected function quoteCharacter(): string;

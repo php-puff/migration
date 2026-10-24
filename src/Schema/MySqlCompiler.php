@@ -18,7 +18,7 @@ final class MySqlCompiler extends AbstractCompiler
 {
     public function hasTable(string $table): array
     {
-        Identifier::validate($table);
+        $table = $this->table($table);
         return ['SELECT 1 AS exists_flag FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$table]];
     }
 
@@ -40,6 +40,6 @@ final class MySqlCompiler extends AbstractCompiler
     protected function dropIndex(string $table, Index $index): string
     {
         $name = $index->name ?? throw new \LogicException('Dropped index must define its name.');
-        return \sprintf('DROP INDEX %s ON %s', $this->quote($name), $this->quote($table));
+        return \sprintf('DROP INDEX %s ON %s', $this->quote($name), $this->quote($this->table($table)));
     }
 }

@@ -12,18 +12,21 @@ declare(strict_types=1);
 namespace Puff\Migration;
 
 use Puff\Database\Contract\ConnectionInterface;
+use Puff\Database\Driver;
 
 final class MigrationRepository
 {
     private const TABLE = 'puff_migrations';
 
-    public function __construct(private readonly ConnectionInterface $connection)
-    {
+    public function __construct(
+        private readonly ConnectionInterface $connection,
+        private readonly string $prefix = '',
+    ) {
     }
 
     public function exists(): bool
     {
-        return (new Schema($this->connection))->hasTable(self::TABLE);
+        return (new Schema($this->connection, prefix: $this->prefix))->hasTable(self::TABLE);
     }
 
     public function ensure(): void
@@ -32,7 +35,7 @@ final class MigrationRepository
             $this->ensureColumns();
             return;
         }
-        (new Schema($this->connection))->create(self::TABLE, static function (Blueprint $table): void {
+        (new Schema($this->connection, prefix: $this->prefix))->create(self::TABLE, static function (Blueprint $table): void {
             $table->string('migration')->primary();
             $table->integer('batch');
             $table->string('checksum', 64);
@@ -51,7 +54,7 @@ final class MigrationRepository
         }
         $records = [];
         foreach ($this->connection->fetchAll(
-            'SELECT migration, batch, checksum, applied_at, duration_ms FROM ' . self::TABLE . ' ORDER BY migration',
+            'SELECT migration, batch, checksum, applied_at, duration_ms FROM ' . $this->table() . ' ORDER BY migration',
         ) as $row) {
             $migration = $row['migration'] ?? null;
             if (!\is_string($migration)) {
@@ -73,14 +76,14 @@ final class MigrationRepository
         if (!$this->exists()) {
             return 1;
         }
-        $row = $this->connection->fetchOne('SELECT MAX(batch) AS batch FROM ' . self::TABLE);
+        $row = $this->connection->fetchOne('SELECT MAX(batch) AS batch FROM ' . $this->table());
         return (int) ($row['batch'] ?? 0) + 1;
     }
 
     public function record(MigrationFile $file, int $batch, float $durationMs): void
     {
         $this->connection->execute(
-            'INSERT INTO ' . self::TABLE . ' (migration, batch, checksum, applied_at, duration_ms) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO ' . $this->table() . ' (migration, batch, checksum, applied_at, duration_ms) VALUES (?, ?, ?, ?, ?)',
             [
                 $file->name,
                 $batch,
@@ -94,7 +97,7 @@ final class MigrationRepository
     public function delete(string $migration): void
     {
         $this->connection->execute(
-            'DELETE FROM ' . self::TABLE . ' WHERE migration = ?',
+            'DELETE FROM ' . $this->table() . ' WHERE migration = ?',
             [$migration],
         );
     }
@@ -103,13 +106,13 @@ final class MigrationRepository
     {
         foreach (['batch', 'checksum', 'applied_at', 'duration_ms'] as $column) {
             try {
-                $this->connection->fetchOne('SELECT ' . $column . ' FROM ' . self::TABLE . ' LIMIT 1');
+                $this->connection->fetchOne('SELECT ' . $column . ' FROM ' . $this->table() . ' LIMIT 1');
                 continue;
             } catch (\PDOException $exception) {
                 if (!$this->isMissingColumn($exception)) {
                     throw $exception;
                 }
-                (new Schema($this->connection))->table(
+                (new Schema($this->connection, prefix: $this->prefix))->table(
                     self::TABLE,
                     static function (Blueprint $table) use ($column): void {
                         match ($column) {
@@ -132,5 +135,12 @@ final class MigrationRepository
             || \str_contains($message, 'no such column')
             || \str_contains($message, 'unknown column')
             || \str_contains($message, 'undefined column');
+    }
+
+    private function table(): string
+    {
+        $table = Schema\Identifier::validate($this->prefix . self::TABLE);
+        $quote = $this->connection->driver() === Driver::MySql ? '`' : '"';
+        return $quote . $table . $quote;
     }
 }

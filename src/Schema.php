@@ -29,11 +29,12 @@ final class Schema
     public function __construct(
         private readonly ConnectionInterface $connection,
         private readonly bool $pretend = false,
+        string $prefix = '',
     ) {
         $this->compiler = match ($connection->driver()) {
-            Driver::MySql => new MySqlCompiler(),
-            Driver::PostgreSql => new PostgresCompiler(),
-            Driver::SQLite => new SQLiteCompiler(),
+            Driver::MySql => new MySqlCompiler($prefix),
+            Driver::PostgreSql => new PostgresCompiler($prefix),
+            Driver::SQLite => new SQLiteCompiler($prefix),
         };
     }
 

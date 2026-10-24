@@ -50,4 +50,22 @@ final class SchemaCompilerTest extends TestCase
         self::assertCount(4, $sql);
         self::assertStringContainsString('DROP INDEX', $sql[3]);
     }
+
+    public function testPrefixesEveryTableReference(): void
+    {
+        $blueprint = new Blueprint('users', true);
+        $blueprint->id();
+        $blueprint->string('email')->unique();
+        $blueprint->foreign('owner_id')->references('id')->on('owners');
+
+        $mysql = new MySqlCompiler('123_');
+        $sql = $mysql->create($blueprint);
+
+        self::assertStringContainsString('CREATE TABLE `123_users`', $sql[0]);
+        self::assertStringContainsString('REFERENCES `123_owners`', $sql[0]);
+        self::assertStringContainsString('`123_users_email_unique` ON `123_users`', $sql[1]);
+        self::assertSame(['123_users'], $mysql->hasTable('users')[1]);
+        self::assertSame('DROP TABLE `123_users`', $mysql->drop('users'));
+        self::assertSame('ALTER TABLE `123_users` RENAME TO `123_members`', $mysql->rename('users', 'members'));
+    }
 }
