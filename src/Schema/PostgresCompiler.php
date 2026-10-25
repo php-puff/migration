@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Puff\Migration\Schema;
 
+use Puff\Migration\Blueprint;
 use Puff\Migration\Column;
 
 final class PostgresCompiler extends AbstractCompiler
@@ -41,5 +42,25 @@ final class PostgresCompiler extends AbstractCompiler
     protected function autoIncrement(Column $column): string
     {
         return '';
+    }
+
+    protected function comments(Blueprint $blueprint): array
+    {
+        $table = $this->quote($this->table($blueprint->table));
+        $statements = [];
+        if ($blueprint->getComment() !== null) {
+            $statements[] = \sprintf('COMMENT ON TABLE %s IS %s', $table, $this->string($blueprint->getComment()));
+        }
+        foreach ($blueprint->columns() as $column) {
+            if ($column->comment !== null) {
+                $statements[] = \sprintf(
+                    'COMMENT ON COLUMN %s.%s IS %s',
+                    $table,
+                    $this->quote($column->name),
+                    $this->string($column->comment),
+                );
+            }
+        }
+        return $statements;
     }
 }

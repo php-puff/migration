@@ -36,13 +36,15 @@ abstract class AbstractCompiler implements CompilerInterface
             throw new \InvalidArgumentException('A table must define at least one column.');
         }
         $sql = [\sprintf(
-            'CREATE TABLE %s (%s)',
+            'CREATE TABLE %s (%s)%s',
             $this->quote($this->table($blueprint->table)),
             \implode(', ', $definitions),
+            $this->tableOptions($blueprint),
         )];
         foreach ($this->indexes($blueprint) as $index) {
             $sql[] = $this->createIndex($blueprint->table, $index);
         }
+        \array_push($sql, ...$this->comments($blueprint));
         return $sql;
     }
 
@@ -83,6 +85,7 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->foreign($blueprint->table, $foreignKey),
             );
         }
+        \array_push($sql, ...$this->comments($blueprint));
         return $sql;
     }
 
@@ -117,7 +120,7 @@ abstract class AbstractCompiler implements CompilerInterface
         if ($column->primary) {
             $sql .= ' PRIMARY KEY';
         }
-        return $sql . $this->autoIncrement($column);
+        return $sql . $this->autoIncrement($column) . $this->columnComment($column);
     }
 
     protected function type(Column $column): string
@@ -148,6 +151,27 @@ abstract class AbstractCompiler implements CompilerInterface
         return false;
     }
 
+    protected function tableOptions(Blueprint $blueprint): string
+    {
+        return '';
+    }
+
+    protected function columnComment(Column $column): string
+    {
+        return '';
+    }
+
+    /** @return list<string> */
+    protected function comments(Blueprint $blueprint): array
+    {
+        return [];
+    }
+
+    protected function string(string $value): string
+    {
+        return "'" . \str_replace("'", "''", $value) . "'";
+    }
+
     protected function defaultValue(mixed $value): string
     {
         return match (true) {
@@ -155,7 +179,7 @@ abstract class AbstractCompiler implements CompilerInterface
             \is_bool($value) => $value ? '1' : '0',
             \is_int($value) => (string) $value,
             \is_float($value) && \is_finite($value) => (string) $value,
-            \is_string($value) => "'" . \str_replace("'", "''", $value) . "'",
+            \is_string($value) => $this->string($value),
             default => throw new \InvalidArgumentException('Column default value is invalid.'),
         };
     }

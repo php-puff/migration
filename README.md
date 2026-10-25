@@ -55,11 +55,12 @@ return new class implements Migration {
         $schema->create('users', static function (Blueprint $table): void {
             $table->id();
             $table->string('email')->unique();
-            $table->string('name', 100)->nullable();
+            $table->string('name', 100)->nullable()->comment('Display name');
             $table->boolean('active')->default(true);
             $table->decimal('credit', 12, 2)->default(0);
             $table->json('settings')->nullable();
             $table->timestamps();
+            $table->comment('Application users');
         });
     }
 
@@ -84,7 +85,7 @@ $schema->hasTable('members');
 $schema->execute('CREATE VIEW active_users AS SELECT * FROM users WHERE active = 1');
 ```
 
-Columns include `id`, `integer`, `bigInteger`, `string`, `text`, `boolean`, `decimal`, `date`, `dateTime`, `timestamp`, `json`, `binary`, and `timestamps`. Modifiers include `nullable`, `default`, `unsigned`, `primary`, `unique`, `index`, and `autoIncrement`.
+Columns include `id`, `integer`, `bigInteger`, `string`, `text`, `boolean`, `decimal`, `date`, `dateTime`, `timestamp`, `json`, `binary`, and `timestamps`. Modifiers include `nullable`, `default`, `unsigned`, `primary`, `unique`, `index`, `autoIncrement`, and `comment`. Table comments use `$table->comment('...')`. MySQL and PostgreSQL persist comments; SQLite ignores them because it has no native table or column comment support.
 
 Alter tables and indexes explicitly:
 

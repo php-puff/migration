@@ -25,6 +25,7 @@ final class Blueprint
     private array $dropColumns = [];
     /** @var list<array{from: string, to: string}> */
     private array $renameColumns = [];
+    private ?string $comment = null;
 
     public function __construct(public readonly string $table, public readonly bool $creating)
     {
@@ -101,6 +102,20 @@ final class Blueprint
     {
         $this->timestamp('created_at')->nullable();
         $this->timestamp('updated_at')->nullable();
+    }
+
+    public function comment(string $comment): self
+    {
+        if (\str_contains($comment, "\0")) {
+            throw new \InvalidArgumentException('Table comment must not contain null bytes.');
+        }
+        $this->comment = $comment;
+        return $this;
+    }
+
+    public function getComment(): ?string
+    {
+        return $this->comment;
     }
 
     /** @param string|list<string> $columns */

@@ -68,4 +68,40 @@ final class SchemaCompilerTest extends TestCase
         self::assertSame('DROP TABLE `123_users`', $mysql->drop('users'));
         self::assertSame('ALTER TABLE `123_users` RENAME TO `123_members`', $mysql->rename('users', 'members'));
     }
+
+    public function testCompilesTableAndColumnComments(): void
+    {
+        $blueprint = new Blueprint('users', true);
+        $blueprint->comment("Application's users");
+        $blueprint->string('name')->comment("User's name");
+
+        $mysql = (new MySqlCompiler('app_'))->create($blueprint);
+        self::assertSame(
+            "CREATE TABLE `app_users` (`name` VARCHAR(255) NOT NULL COMMENT 'User''s name') COMMENT='Application''s users'",
+            $mysql[0],
+        );
+
+        $postgres = (new PostgresCompiler('app_'))->create($blueprint);
+        self::assertSame("COMMENT ON TABLE \"app_users\" IS 'Application''s users'", $postgres[1]);
+        self::assertSame("COMMENT ON COLUMN \"app_users\".\"name\" IS 'User''s name'", $postgres[2]);
+
+        $sqlite = (new SQLiteCompiler('app_'))->create($blueprint);
+        self::assertCount(1, $sqlite);
+        self::assertStringNotContainsString('COMMENT', $sqlite[0]);
+    }
+
+    public function testCompilesAlterTableComments(): void
+    {
+        $blueprint = new Blueprint('users', false);
+        $blueprint->comment('Registered users');
+        $blueprint->string('nickname')->comment('Public name');
+
+        $mysql = (new MySqlCompiler())->alter($blueprint);
+        self::assertSame("ALTER TABLE `users` ADD COLUMN `nickname` VARCHAR(255) NOT NULL COMMENT 'Public name'", $mysql[0]);
+        self::assertSame("ALTER TABLE `users` COMMENT = 'Registered users'", $mysql[1]);
+
+        $postgres = (new PostgresCompiler())->alter($blueprint);
+        self::assertSame("COMMENT ON TABLE \"users\" IS 'Registered users'", $postgres[1]);
+        self::assertSame("COMMENT ON COLUMN \"users\".\"nickname\" IS 'Public name'", $postgres[2]);
+    }
 }

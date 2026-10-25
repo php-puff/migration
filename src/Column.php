@@ -23,6 +23,7 @@ final class Column
     public bool $autoIncrement = false;
     public bool $hasDefault = false;
     public mixed $default = null;
+    public ?string $comment = null;
 
     public function __construct(
         public readonly string $name,
@@ -76,6 +77,15 @@ final class Column
         }
         $this->hasDefault = true;
         $this->default = $value;
+        return $this;
+    }
+
+    public function comment(string $comment): self
+    {
+        if (\str_contains($comment, "\0")) {
+            throw new \InvalidArgumentException('Column comment must not contain null bytes.');
+        }
+        $this->comment = $comment;
         return $this;
     }
 }
