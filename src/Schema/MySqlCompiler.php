@@ -38,6 +38,21 @@ final class MySqlCompiler extends AbstractCompiler
         return $column->autoIncrement ? ' AUTO_INCREMENT' : '';
     }
 
+    protected function type(Column $column): string
+    {
+        return match ($column->type) {
+            'tinyText' => 'TINYTEXT',
+            'mediumText' => 'MEDIUMTEXT',
+            'longText' => 'LONGTEXT',
+            'enum' => 'ENUM(' . \implode(', ', \array_map($this->string(...), $column->allowed ?? [])) . ')',
+            'dateTime', 'dateTimeTz' => 'DATETIME' . $this->precision($column),
+            'time', 'timeTz' => 'TIME' . $this->precision($column),
+            'timestamp', 'timestampTz' => 'TIMESTAMP' . $this->precision($column),
+            'year' => 'YEAR',
+            default => parent::type($column),
+        };
+    }
+
     protected function tableOptions(Blueprint $blueprint): string
     {
         return $blueprint->getComment() === null ? '' : ' COMMENT=' . $this->string($blueprint->getComment());
@@ -62,7 +77,7 @@ final class MySqlCompiler extends AbstractCompiler
 
     protected function dropIndex(string $table, Index $index): string
     {
-        $name = $index->name ?? throw new \LogicException('Dropped index must define its name.');
+        $name = $index->name ?? $this->name($table, $index->columns, 'index');
         return \sprintf('DROP INDEX %s ON %s', $this->quote($name), $this->quote($this->table($table)));
     }
 }

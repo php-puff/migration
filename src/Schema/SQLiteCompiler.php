@@ -47,9 +47,10 @@ final class SQLiteCompiler extends AbstractCompiler
     protected function type(Column $column): string
     {
         return match ($column->type) {
-            'bigInteger', 'boolean' => 'INTEGER',
-            'date', 'dateTime', 'timestamp' => 'TEXT',
-            'json' => 'TEXT',
+            'tinyInteger', 'smallInteger', 'mediumInteger', 'bigInteger', 'boolean', 'year' => 'INTEGER',
+            'float', 'double', 'decimal' => 'REAL',
+            'date', 'dateTime', 'dateTimeTz', 'time', 'timeTz', 'timestamp', 'timestampTz' => 'TEXT',
+            'json', 'jsonb', 'uuid', 'ulid', 'ipAddress', 'macAddress' => 'TEXT',
             default => parent::type($column),
         };
     }

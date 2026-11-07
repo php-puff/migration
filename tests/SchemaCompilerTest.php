@@ -48,7 +48,7 @@ final class SchemaCompilerTest extends TestCase
 
         $sql = (new MySqlCompiler())->alter($blueprint);
         self::assertCount(4, $sql);
-        self::assertStringContainsString('DROP INDEX', $sql[3]);
+        self::assertStringContainsString('DROP INDEX', $sql[1]);
     }
 
     public function testPrefixesEveryTableReference(): void
@@ -103,5 +103,71 @@ final class SchemaCompilerTest extends TestCase
         $postgres = (new PostgresCompiler())->alter($blueprint);
         self::assertSame("COMMENT ON TABLE \"users\" IS 'Registered users'", $postgres[1]);
         self::assertSame("COMMENT ON COLUMN \"users\".\"nickname\" IS 'Public name'", $postgres[2]);
+    }
+
+    public function testBuildsNumericUuidAndUlidMorphs(): void
+    {
+        $blueprint = new Blueprint('images', true);
+        $blueprint->morphs('imageable');
+        $blueprint->nullableUuidMorphs('owner');
+        $blueprint->ulidMorphs('tenant', 'images_tenant_index');
+
+        self::assertSame(
+            ['imageable_type', 'imageable_id', 'owner_type', 'owner_id', 'tenant_type', 'tenant_id'],
+            \array_map(static fn ($column): string => $column->name, $blueprint->columns()),
+        );
+        self::assertTrue($blueprint->columns()[1]->unsigned);
+        self::assertTrue($blueprint->columns()[2]->nullable);
+        self::assertTrue($blueprint->columns()[3]->nullable);
+
+        $mysql = (new MySqlCompiler())->create($blueprint);
+        self::assertStringContainsString('`imageable_id` BIGINT UNSIGNED NOT NULL', $mysql[0]);
+        self::assertStringContainsString('`owner_id` CHAR(36)', $mysql[0]);
+        self::assertStringContainsString('`tenant_id` CHAR(26) NOT NULL', $mysql[0]);
+        self::assertCount(4, $mysql);
+
+        $postgres = (new PostgresCompiler())->create($blueprint);
+        self::assertStringContainsString('"owner_id" UUID', $postgres[0]);
+    }
+
+    public function testDropsMorphColumnsAndGeneratedIndex(): void
+    {
+        $blueprint = new Blueprint('images', false);
+        $blueprint->dropMorphs('imageable');
+
+        $sql = (new MySqlCompiler('app_'))->alter($blueprint);
+        self::assertSame('DROP INDEX `app_images_imageable_type_imageable_id_index` ON `app_images`', $sql[0]);
+        self::assertSame('ALTER TABLE `app_images` DROP COLUMN `imageable_type`', $sql[1]);
+        self::assertSame('ALTER TABLE `app_images` DROP COLUMN `imageable_id`', $sql[2]);
+    }
+
+    public function testCompilesCommonBlueprintColumnHelpers(): void
+    {
+        $blueprint = new Blueprint('profiles', true);
+        $blueprint->increments('sequence');
+        $blueprint->tinyInteger('rank');
+        $blueprint->char('code', 8);
+        $blueprint->enum('state', ['active', 'disabled']);
+        $blueprint->jsonb('metadata');
+        $blueprint->dateTimeTz('verified_at', 3)->nullable();
+        $blueprint->year('birth_year');
+        $blueprint->ipAddress();
+        $blueprint->macAddress();
+        $blueprint->softDeletes();
+        $blueprint->rememberToken();
+
+        $mysql = (new MySqlCompiler())->create($blueprint)[0];
+        self::assertStringContainsString('`sequence` INTEGER UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT', $mysql);
+        self::assertStringContainsString("`state` ENUM('active', 'disabled')", $mysql);
+        self::assertStringContainsString('`verified_at` DATETIME(3)', $mysql);
+
+        $postgres = (new PostgresCompiler())->create($blueprint)[0];
+        self::assertStringContainsString('"state" VARCHAR(255) CHECK', $postgres);
+        self::assertStringContainsString('"metadata" JSONB', $postgres);
+        self::assertStringContainsString('"verified_at" TIMESTAMP(3) WITH TIME ZONE', $postgres);
+
+        $sqlite = (new SQLiteCompiler())->create($blueprint)[0];
+        self::assertStringContainsString('"metadata" TEXT', $sqlite);
+        self::assertStringContainsString('"birth_year" INTEGER', $sqlite);
     }
 }

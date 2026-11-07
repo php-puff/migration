@@ -30,6 +30,8 @@ final class Column
         public readonly string $type,
         public readonly ?int $length = null,
         public readonly ?int $scale = null,
+        /** @var list<string>|null */
+        public readonly ?array $allowed = null,
     ) {
         Identifier::validate($name);
     }

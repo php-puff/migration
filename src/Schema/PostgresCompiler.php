@@ -33,7 +33,12 @@ final class PostgresCompiler extends AbstractCompiler
             return $column->type === 'bigInteger' ? 'BIGSERIAL' : 'SERIAL';
         }
         return match ($column->type) {
-            'dateTime' => 'TIMESTAMP',
+            'tinyInteger', 'smallInteger' => 'SMALLINT',
+            'mediumInteger' => 'INTEGER',
+            'float' => 'DOUBLE PRECISION',
+            'dateTime' => 'TIMESTAMP' . $this->precision($column),
+            'jsonb' => 'JSONB',
+            'uuid' => 'UUID',
             'binary' => 'BYTEA',
             default => parent::type($column),
         };

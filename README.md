@@ -85,7 +85,19 @@ $schema->hasTable('members');
 $schema->execute('CREATE VIEW active_users AS SELECT * FROM users WHERE active = 1');
 ```
 
-Columns include `id`, `integer`, `bigInteger`, `string`, `text`, `boolean`, `decimal`, `date`, `dateTime`, `timestamp`, `json`, `binary`, and `timestamps`. Modifiers include `nullable`, `default`, `unsigned`, `primary`, `unique`, `index`, `autoIncrement`, and `comment`. Table comments use `$table->comment('...')`. MySQL and PostgreSQL persist comments; SQLite ignores them because it has no native table or column comment support.
+Column helpers include integer sizes and unsigned variants, `char`, text sizes, `float`, `double`, `decimal`, `boolean`, `enum`, `date`, time and timezone variants, `json`, `jsonb`, `binary`, `year`, `uuid`, `ulid`, IP/MAC addresses, timestamps, soft deletes, and remember tokens. Modifiers include `nullable`, `default`, `unsigned`, `primary`, `unique`, `index`, `autoIncrement`, and `comment`. Table comments use `$table->comment('...')`. MySQL and PostgreSQL persist comments; SQLite ignores them because it has no native table or column comment support.
+
+Polymorphic relations support numeric IDs by default, plus explicit UUID and ULID variants:
+
+```php
+$table->morphs('imageable');
+$table->nullableMorphs('taggable');
+$table->uuidMorphs('owner');
+$table->nullableUlidMorphs('tenant');
+
+// In a down migration:
+$table->dropMorphs('imageable');
+```
 
 Alter tables and indexes explicitly:
 

@@ -58,6 +58,11 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->column($column),
             );
         }
+        foreach ($this->indexes($blueprint) as $index) {
+            $sql[] = $index->drop
+                ? $this->dropIndex($blueprint->table, $index)
+                : $this->createIndex($blueprint->table, $index);
+        }
         foreach ($blueprint->droppedColumns() as $column) {
             $sql[] = \sprintf(
                 'ALTER TABLE %s DROP COLUMN %s',
@@ -72,11 +77,6 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->quote($rename['from']),
                 $this->quote($rename['to']),
             );
-        }
-        foreach ($this->indexes($blueprint) as $index) {
-            $sql[] = $index->drop
-                ? $this->dropIndex($blueprint->table, $index)
-                : $this->createIndex($blueprint->table, $index);
         }
         foreach ($blueprint->foreignKeys() as $foreignKey) {
             $sql[] = \sprintf(
@@ -127,18 +127,46 @@ abstract class AbstractCompiler implements CompilerInterface
     {
         return match ($column->type) {
             'integer' => 'INTEGER',
+            'tinyInteger' => 'TINYINT',
+            'smallInteger' => 'SMALLINT',
+            'mediumInteger' => 'MEDIUMINT',
             'bigInteger' => 'BIGINT',
+            'char' => 'CHAR(' . ($column->length ?? 255) . ')',
             'string' => 'VARCHAR(' . ($column->length ?? 255) . ')',
-            'text' => 'TEXT',
+            'tinyText', 'text', 'mediumText', 'longText' => 'TEXT',
+            'float' => 'FLOAT(' . ($column->length ?? 53) . ')',
+            'double' => 'DOUBLE PRECISION',
             'boolean' => 'BOOLEAN',
             'decimal' => 'DECIMAL(' . ($column->length ?? 10) . ', ' . ($column->scale ?? 2) . ')',
+            'enum' => $this->enum($column),
             'date' => 'DATE',
-            'dateTime' => 'DATETIME',
-            'timestamp' => 'TIMESTAMP',
-            'json' => 'JSON',
+            'dateTime' => 'TIMESTAMP' . $this->precision($column),
+            'dateTimeTz' => 'TIMESTAMP' . $this->precision($column) . ' WITH TIME ZONE',
+            'time' => 'TIME' . $this->precision($column),
+            'timeTz' => 'TIME' . $this->precision($column) . ' WITH TIME ZONE',
+            'timestamp' => 'TIMESTAMP' . $this->precision($column),
+            'timestampTz' => 'TIMESTAMP' . $this->precision($column) . ' WITH TIME ZONE',
+            'json', 'jsonb' => 'JSON',
             'binary' => 'BLOB',
+            'year' => 'SMALLINT',
+            'uuid' => 'CHAR(36)',
+            'ulid' => 'CHAR(26)',
+            'ipAddress' => 'VARCHAR(45)',
+            'macAddress' => 'VARCHAR(17)',
             default => throw new UnsupportedSchemaOperation("Unsupported column type [{$column->type}]."),
         };
+    }
+
+    protected function enum(Column $column): string
+    {
+        $allowed = $column->allowed ?? throw new \LogicException('Enum values are required.');
+        return 'VARCHAR(255) CHECK (' . $this->quote($column->name) . ' IN ('
+            . \implode(', ', \array_map($this->string(...), $allowed)) . '))';
+    }
+
+    protected function precision(Column $column): string
+    {
+        return $column->length === null ? '' : '(' . $column->length . ')';
     }
 
     protected function autoIncrement(Column $column): string
@@ -220,7 +248,7 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function dropIndex(string $table, Index $index): string
     {
-        $name = $index->name ?? throw new \LogicException('Dropped index must define its name.');
+        $name = $index->name ?? $this->name($table, $index->columns, 'index');
         return 'DROP INDEX ' . $this->quote($name);
     }
 
@@ -239,7 +267,7 @@ abstract class AbstractCompiler implements CompilerInterface
     }
 
     /** @param list<string> $columns */
-    private function name(string $table, array $columns, string $suffix): string
+    protected function name(string $table, array $columns, string $suffix): string
     {
         $name = \strtolower($this->table($table) . '_' . \implode('_', $columns) . '_' . $suffix);
         return Identifier::validate(\strlen($name) <= 63 ? $name : \substr($name, 0, 54) . '_' . \substr(\hash('sha256', $name), 0, 8));
