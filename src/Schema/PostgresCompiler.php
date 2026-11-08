@@ -49,6 +49,15 @@ final class PostgresCompiler extends AbstractCompiler
         return '';
     }
 
+    protected function defaultValue(mixed $value): string
+    {
+        if (\is_bool($value)) {
+            return $value ? 'TRUE' : 'FALSE';
+        }
+
+        return parent::defaultValue($value);
+    }
+
     protected function comments(Blueprint $blueprint): array
     {
         $table = $this->quote($this->table($blueprint->table));

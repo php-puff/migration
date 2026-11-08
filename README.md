@@ -87,11 +87,12 @@ $schema->execute('CREATE VIEW active_users AS SELECT * FROM users WHERE active =
 
 Column helpers include integer sizes and unsigned variants, `char`, text sizes, `float`, `double`, `decimal`, `boolean`, `enum`, `date`, time and timezone variants, `json`, `jsonb`, `binary`, `year`, `uuid`, `ulid`, IP/MAC addresses, timestamps, soft deletes, and remember tokens. Modifiers include `nullable`, `default`, `unsigned`, `primary`, `unique`, `index`, `autoIncrement`, and `comment`. Table comments use `$table->comment('...')`. MySQL and PostgreSQL persist comments; SQLite ignores them because it has no native table or column comment support.
 
-Polymorphic relations support numeric IDs by default, plus explicit UUID and ULID variants:
+Polymorphic relations use ULID IDs by default, with explicit numeric and UUID variants:
 
 ```php
 $table->morphs('imageable');
 $table->nullableMorphs('taggable');
+$table->numericMorphs('legacy');
 $table->uuidMorphs('owner');
 $table->nullableUlidMorphs('tenant');
 

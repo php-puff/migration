@@ -322,14 +322,14 @@ final class Blueprint
         return $this->string('remember_token', 100)->nullable();
     }
 
-    public function morphs(string $name, ?string $indexName = null): void
+    public function morphs(string $name, ?string $indexName = null, ?string $typeComment = null, ?string $idComment = null): void
     {
-        $this->numericMorphs($name, $indexName);
+        $this->morphColumns($name, 'ulid', false, $indexName, $typeComment, $idComment);
     }
 
-    public function nullableMorphs(string $name, ?string $indexName = null): void
+    public function nullableMorphs(string $name, ?string $indexName = null, ?string $typeComment = null, ?string $idComment = null): void
     {
-        $this->nullableNumericMorphs($name, $indexName);
+        $this->morphColumns($name, 'ulid', true, $indexName, $typeComment, $idComment);
     }
 
     public function numericMorphs(string $name, ?string $indexName = null): void
@@ -511,14 +511,20 @@ final class Blueprint
         return $this->column($name, $type, $precision);
     }
 
-    private function morphColumns(string $name, string $type, bool $nullable, ?string $indexName): void
+    private function morphColumns(string $name, string $type, bool $nullable, ?string $indexName, ?string $typeComment = null, ?string $idComment = null): void
     {
         Identifier::validate($name);
-        $this->string($name . '_type')->nullable($nullable);
+        $typeColumn = $this->string($name . '_type')->nullable($nullable);
         $id = $type === 'bigInteger'
             ? $this->unsignedBigInteger($name . '_id')
             : $this->column($name . '_id', $type);
         $id->nullable($nullable);
+        if ($typeComment !== null) {
+            $typeColumn->comment($typeComment);
+        }
+        if ($idComment !== null) {
+            $id->comment($idComment);
+        }
         $this->index([$name . '_type', $name . '_id'], $indexName);
     }
 

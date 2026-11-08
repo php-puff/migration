@@ -33,6 +33,7 @@ final class SchemaCompilerTest extends TestCase
 
         $postgres = (new PostgresCompiler())->create($blueprint);
         self::assertStringContainsString('BIGSERIAL', $postgres[0]);
+        self::assertStringContainsString('"active" BOOLEAN NOT NULL DEFAULT TRUE', $postgres[0]);
 
         $sqlite = (new SQLiteCompiler())->create($blueprint);
         self::assertStringContainsString('AUTOINCREMENT', $sqlite[0]);
@@ -108,23 +109,27 @@ final class SchemaCompilerTest extends TestCase
     public function testBuildsNumericUuidAndUlidMorphs(): void
     {
         $blueprint = new Blueprint('images', true);
-        $blueprint->morphs('imageable');
+        $blueprint->morphs('imageable', typeComment: 'Image type', idComment: 'Image ID');
+        $blueprint->numericMorphs('numeric');
         $blueprint->nullableUuidMorphs('owner');
         $blueprint->ulidMorphs('tenant', 'images_tenant_index');
 
         self::assertSame(
-            ['imageable_type', 'imageable_id', 'owner_type', 'owner_id', 'tenant_type', 'tenant_id'],
+            ['imageable_type', 'imageable_id', 'numeric_type', 'numeric_id', 'owner_type', 'owner_id', 'tenant_type', 'tenant_id'],
             \array_map(static fn ($column): string => $column->name, $blueprint->columns()),
         );
-        self::assertTrue($blueprint->columns()[1]->unsigned);
-        self::assertTrue($blueprint->columns()[2]->nullable);
-        self::assertTrue($blueprint->columns()[3]->nullable);
+        self::assertSame('Image type', $blueprint->columns()[0]->comment);
+        self::assertSame('Image ID', $blueprint->columns()[1]->comment);
+        self::assertTrue($blueprint->columns()[3]->unsigned);
+        self::assertTrue($blueprint->columns()[4]->nullable);
+        self::assertTrue($blueprint->columns()[5]->nullable);
 
         $mysql = (new MySqlCompiler())->create($blueprint);
-        self::assertStringContainsString('`imageable_id` BIGINT UNSIGNED NOT NULL', $mysql[0]);
+        self::assertStringContainsString('`imageable_id` CHAR(26) NOT NULL', $mysql[0]);
+        self::assertStringContainsString('`numeric_id` BIGINT UNSIGNED NOT NULL', $mysql[0]);
         self::assertStringContainsString('`owner_id` CHAR(36)', $mysql[0]);
         self::assertStringContainsString('`tenant_id` CHAR(26) NOT NULL', $mysql[0]);
-        self::assertCount(4, $mysql);
+        self::assertCount(5, $mysql);
 
         $postgres = (new PostgresCompiler())->create($blueprint);
         self::assertStringContainsString('"owner_id" UUID', $postgres[0]);
