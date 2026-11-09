@@ -10,5 +10,5 @@
 declare(strict_types=1);
 
 return [
-    'path' => \dirname(__DIR__) . '/database/migrations',
+    'path' => \dirname(__DIR__) . '/database/Migration',
 ];
