@@ -24,6 +24,7 @@ The database connection defaults to `database.default`. A command may temporaril
 ./puff migration create create_users_table
 ./puff migration create add_nickname --table=users
 ./puff migration run
+./puff migration run access # Run a single migration by unique suffix; full filename also works.
 ./puff migration status
 ./puff migration rollback
 ./puff migration rollback --step=2

@@ -70,12 +70,31 @@ final class Migrator
     }
 
     /** @return array{migrations: list<string>, statements: list<string>} */
-    public function run(bool $pretend = false): array
+    public function run(bool $pretend = false, ?string $name = null): array
     {
-        return $this->lock->synchronized(function () use ($pretend): array {
-            $this->assertHistory($pretend);
+        return $this->lock->synchronized(function () use ($pretend, $name): array {
+            if ($name === null) {
+                $this->assertHistory($pretend);
+            }
             $files = $this->loader->files();
+            if ($name !== null) {
+                $matches = \array_filter($files, static fn (MigrationFile $file): bool =>
+                    $file->name === $name || \str_ends_with($file->name, '_' . $name));
+                if (\count($matches) !== 1) {
+                    throw new MigrationException(\count($matches) === 0
+                        ? "Migration [{$name}] was not found."
+                        : "Migration [{$name}] is ambiguous; use its full name.");
+                }
+                $files = $matches;
+            }
             $records = $this->repository->all(!$pretend);
+            if ($name !== null) {
+                $file = \reset($files);
+                $record = $records[$file->name] ?? null;
+                if ($record !== null && !\hash_equals($record->checksum, $file->checksum)) {
+                    throw new MigrationException("Migration [{$file->name}] is modified; repair migration history before continuing.");
+                }
+            }
             $pending = \array_diff_key($files, $records);
             if ($pending === []) {
                 return ['migrations' => [], 'statements' => []];

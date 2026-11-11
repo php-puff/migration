@@ -35,11 +35,11 @@ final class MigratorTest extends TestCase
             $source = \file_get_contents($path);
             self::assertIsString($source);
             $source = \str_replace(
-                '// Apply create_users_table.',
+                "// \$schema->create('table_name', static function (Blueprint \$table): void {\n        //     \$table->id();\n        //     \$table->timestamps();\n        // });",
                 '$schema->create(\'users\', static function (\\Puff\\Migration\\Blueprint $table): void { $table->id(); });',
                 $source,
             );
-            $source = \str_replace('// Revert create_users_table.', '$schema->drop(\'users\');', $source);
+            $source = \str_replace("// \$schema->dropIfExists('table_name');", '$schema->drop(\'users\');', $source);
             self::assertNotFalse(\file_put_contents($path, $source));
 
             self::assertSame('pending', $migrator->status()[0]['status']);
@@ -89,7 +89,7 @@ final class MigratorTest extends TestCase
             $path = $migrator->create('create_audit_table');
             $source = (string) \file_get_contents($path);
             $source = \str_replace(
-                '// Apply create_audit_table.',
+                "// \$schema->create('table_name', static function (Blueprint \$table): void {\n        //     \$table->id();\n        //     \$table->timestamps();\n        // });",
                 '$schema->create(\'audit\', static function (\\Puff\\Migration\\Blueprint $table): void { $table->id(); });',
                 $source,
             );
@@ -115,6 +115,42 @@ final class MigratorTest extends TestCase
 
             $this->expectException(MigrationException::class);
             $migrator->run();
+        } finally {
+            $this->removeFixture($database, $directory);
+        }
+    }
+
+    public function testRunsSelectedMigrationDespiteUnrelatedModifiedHistory(): void
+    {
+        [$database, $directory, $migrator] = $this->fixture();
+        try {
+            $first = $migrator->create('first_change');
+            $migrator->run();
+            self::assertNotFalse(\file_put_contents($first, "\n// changed\n", \FILE_APPEND));
+
+            $second = $migrator->create('access');
+            $name = \pathinfo($second, \PATHINFO_FILENAME);
+            self::assertSame([$name], $migrator->run(false, 'access')['migrations']);
+            self::assertSame([], $migrator->run(false, $name)['migrations']);
+            self::assertSame('applied', \array_values(\array_filter($migrator->status(),
+                static fn (array $status): bool => $status['name'] === $name))[0]['status']);
+
+            $this->expectException(MigrationException::class);
+            $migrator->run(false, 'first_change');
+        } finally {
+            $this->removeFixture($database, $directory);
+        }
+    }
+
+    public function testRejectsAmbiguousMigrationName(): void
+    {
+        [$database, $directory, $migrator] = $this->fixture();
+        try {
+            $migrator->create('first_access');
+            \usleep(1_000_000);
+            $migrator->create('second_access');
+            $this->expectException(MigrationException::class);
+            $migrator->run(false, 'access');
         } finally {
             $this->removeFixture($database, $directory);
         }

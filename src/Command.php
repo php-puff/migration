@@ -59,7 +59,7 @@ final readonly class Command implements Contract
         }
         return match ($action) {
             'create' => $this->create($migrator, $input, $output),
-            'run' => $this->result($migrator->run($input->hasOption('pretend')), 'Applied', $output),
+            'run' => $this->result($migrator->run($input->hasOption('pretend'), $input->argument(1)), 'Applied', $output),
             'status' => $this->status($migrator, $output),
             'rollback' => $this->result(
                 $migrator->rollback($this->steps($input), $input->hasOption('pretend')),
